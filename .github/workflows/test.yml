@@ -1,0 +1,30 @@
+name: test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./
+        id: ssl
+        with:
+          urls: github.com expired.badssl.com self-signed.badssl.com
+
+      - name: Assert outputs
+        env:
+          JSON: ${{ steps.ssl.outputs.json }}
+          STATUS: ${{ steps.ssl.outputs.status }}
+          ALERT: ${{ steps.ssl.outputs.alert }}
+        run: |
+          status_of() { jq -r --arg h "$1" '.[] | select(.host == $h) | .status' <<< "$JSON"; }
+          jq . <<< "$JSON"
+          test "$STATUS" = error
+          test "$ALERT" = true
+          test "$(status_of github.com)" != error
+          test "$(status_of expired.badssl.com)" = critical
+          test "$(status_of self-signed.badssl.com)" = error

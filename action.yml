@@ -1,0 +1,39 @@
+name: SSL Expiry Check
+description: Check TLS certificate expiry for one or more URLs. Returns JSON plus alert-ready outputs.
+branding:
+  icon: lock
+  color: green
+
+inputs:
+  urls:
+    description: One or more URLs or hosts, separated by newline, comma or space (e.g. "example.com", "https://api.example.com:8443").
+    required: true
+  warning-days:
+    description: Status is "warning" when days left <= this value.
+    default: '30'
+  critical-days:
+    description: Status is "critical" when days left <= this value. Expired certificates are always critical.
+    default: '7'
+  timeout:
+    description: Per-host timeout in seconds.
+    default: '10'
+  fail-on:
+    description: Fail the step when the worst status reaches this level. One of none | warning | critical | error.
+    default: 'none'
+  ca:
+    description: Extra CA certificate(s) to trust on top of the default public roots, e.g. for internal services. PEM text (may contain several certs, e.g. from a secret) or a path to a PEM file.
+    required: false
+
+outputs:
+  json:
+    description: JSON array of results, worst first. Each item has url, host, port, status, days_left, expires_at, issuer, error.
+  status:
+    description: Worst status across all URLs (ok | warning | critical | error).
+  alert:
+    description: '"true" if any URL is not ok, otherwise "false".'
+  message:
+    description: Human-readable lines for every non-ok URL, ready to send to Slack / Feishu / DingTalk / email. Empty when all ok.
+
+runs:
+  using: node24
+  main: index.js
