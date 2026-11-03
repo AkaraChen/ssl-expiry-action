@@ -27,6 +27,7 @@
 | `warning-days` | `30` | 剩余天数 ≤ 该值 → `warning` |
 | `critical-days` | `7` | 剩余天数 ≤ 该值 → `critical`（已过期也是 `critical`） |
 | `timeout` | `10` | 单个域名超时秒数 |
+| `retries` | `2` | 读不到证书时（连接被重置、超时、DNS 等）额外重试的次数，避免网络抖动造成误报。证书本身的问题不会重试 |
 | `fail-on` | `none` | 最差状态达到该级别时让 step 失败：`none` / `warning` / `critical` / `error` |
 | `ca` | 空 | 额外信任的 CA 证书（内网服务用）。PEM 文本（可含多张证书）或 PEM 文件路径，见下文 |
 

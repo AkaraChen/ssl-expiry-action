@@ -27,6 +27,7 @@ A zero-dependency GitHub Action that checks TLS certificate expiry in parallel, 
 | `warning-days` | `30` | Days left ≤ this → `warning` |
 | `critical-days` | `7` | Days left ≤ this → `critical` (expired certs are always `critical`) |
 | `timeout` | `10` | Per-host timeout in seconds |
+| `retries` | `2` | Extra attempts when no certificate could be read (connection reset, timeout, DNS...), so network blips don't trigger false alerts. Certificate problems are never retried |
 | `fail-on` | `none` | Fail the step when the worst status reaches this level: `none` / `warning` / `critical` / `error` |
 | `ca` | empty | Extra CA certificate(s) to trust, for internal services. PEM text (may contain several certs) or a path to a PEM file. See below |
 

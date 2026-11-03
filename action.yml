@@ -17,6 +17,9 @@ inputs:
   timeout:
     description: Per-host timeout in seconds.
     default: '10'
+  retries:
+    description: Extra attempts when no certificate could be read (connection reset, timeout, DNS...), to avoid false alerts from network blips. Certificate problems are never retried.
+    default: '2'
   fail-on:
     description: Fail the step when the worst status reaches this level. One of none | warning | critical | error.
     default: 'none'

@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const tls = require('node:tls');
 const { randomUUID, X509Certificate } = require('node:crypto');
+const { setTimeout: sleep } = require('node:timers/promises');
 
 const DAY = 86_400_000;
 const RANK = { ok: 0, warning: 1, critical: 2, error: 3 };
@@ -15,6 +16,7 @@ const urls = [...new Set(input('urls', '').split(/[\s,]+/).filter(Boolean))];
 const warningDays = Number(input('warning-days', '30'));
 const criticalDays = Number(input('critical-days', '7'));
 const timeoutMs = Number(input('timeout', '10')) * 1000;
+const retries = Number(input('retries', '2'));
 const failOn = input('fail-on', 'none');
 const caInput = input('ca', '');
 
@@ -87,7 +89,17 @@ function check(url, secureContext) {
   });
 }
 
-const label = (r) => (!r.host ? r.url : r.port === 443 ? r.host : `${r.host}:${r.port}`);
+// Retry only when no certificate was read (reset, timeout, DNS...). Cert problems and bad URLs are final.
+async function checkWithRetry(url, secureContext) {
+  let result = await check(url, secureContext);
+  for (let i = 0; i < retries && result.host && result.days_left === null; i++) {
+    await sleep(1000);
+    result = await check(url, secureContext);
+  }
+  return result;
+}
+
+const label =(r) => (!r.host ? r.url : r.port === 443 ? r.host : `${r.host}:${r.port}`);
 const days = (n) => `${n} day${Math.abs(n) === 1 ? '' : 's'}`;
 
 function line(r) {
@@ -115,12 +127,12 @@ function writeSummary(results) {
 async function main() {
   if (!urls.length) throw new Error('input "urls" is required');
   if (!['none', 'warning', 'critical', 'error'].includes(failOn)) throw new Error(`invalid fail-on: ${failOn}`);
-  if (![warningDays, criticalDays, timeoutMs].every(Number.isFinite)) {
-    throw new Error('warning-days, critical-days and timeout must be numbers');
+  if (![warningDays, criticalDays, timeoutMs, retries].every(Number.isFinite)) {
+    throw new Error('warning-days, critical-days, timeout and retries must be numbers');
   }
   const secureContext = caInput ? loadCa(caInput) : undefined;
 
-  const results = (await Promise.all(urls.map((url) => check(url, secureContext))))
+  const results = (await Promise.all(urls.map((url) => checkWithRetry(url, secureContext))))
     .sort((a, b) => RANK[b.status] - RANK[a.status] || (a.days_left ?? 0) - (b.days_left ?? 0));
   const status = results[0].status; // sorted worst-first
   const problems = results.filter((r) => r.status !== 'ok');
