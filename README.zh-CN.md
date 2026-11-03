@@ -25,7 +25,7 @@
 |---|---|---|
 | `urls` | **必填** | 一个或多个 URL / 域名，换行、逗号、空格分隔。不写协议默认 https，不写端口默认 443 |
 | `warning-days` | `30` | 剩余天数 ≤ 该值 → `warning` |
-| `critical-days` | `7` | 剩余天数 ≤ 该值 → `critical`（已过期也是 `critical`） |
+| `critical-days` | `7` | 剩余天数 ≤ 该值 → `critical`（已过期也是 `critical`）。不能大于 `warning-days` |
 | `timeout` | `10` | 单个域名超时秒数 |
 | `retries` | `2` | 读不到证书时（连接被重置、超时、DNS 等）额外重试的次数，避免网络抖动造成误报。证书本身的问题不会重试 |
 | `fail-on` | `none` | 最差状态达到该级别时让 step 失败：`none` / `warning` / `critical` / `error` |
@@ -160,6 +160,7 @@ jobs:
 
 - 公共仓库 60 天没有提交时，GitHub 会自动停用定时 workflow，监控会悄悄停止。
 - 引用时建议固定到完整 commit SHA 而不是 `@v1`。
+- 运行时为 `node24`，需要 Actions Runner v2.327.1 及以上。GitHub 托管的 runner 没问题，self-hosted runner 版本太旧的需要先升级。
 
 ## License
 

@@ -99,7 +99,7 @@ async function checkWithRetry(url, secureContext) {
   return result;
 }
 
-const label =(r) => (!r.host ? r.url : r.port === 443 ? r.host : `${r.host}:${r.port}`);
+const label = (r) => (!r.host ? r.url : r.port === 443 ? r.host : `${r.host}:${r.port}`);
 const days = (n) => `${n} day${Math.abs(n) === 1 ? '' : 's'}`;
 
 function line(r) {
@@ -130,6 +130,9 @@ async function main() {
   if (![warningDays, criticalDays, timeoutMs, retries].every(Number.isFinite)) {
     throw new Error('warning-days, critical-days, timeout and retries must be numbers');
   }
+  if (timeoutMs <= 0) throw new Error('timeout must be greater than 0');
+  if (retries < 0) throw new Error('retries must not be negative');
+  if (criticalDays > warningDays) throw new Error('critical-days must not be greater than warning-days');
   const secureContext = caInput ? loadCa(caInput) : undefined;
 
   const results = (await Promise.all(urls.map((url) => checkWithRetry(url, secureContext))))

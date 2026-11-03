@@ -25,7 +25,7 @@ A zero-dependency GitHub Action that checks TLS certificate expiry in parallel, 
 |---|---|---|
 | `urls` | **required** | One or more URLs / hosts, separated by newline, comma or space. Scheme defaults to https, port to 443 |
 | `warning-days` | `30` | Days left ≤ this → `warning` |
-| `critical-days` | `7` | Days left ≤ this → `critical` (expired certs are always `critical`) |
+| `critical-days` | `7` | Days left ≤ this → `critical` (expired certs are always `critical`). Must not exceed `warning-days` |
 | `timeout` | `10` | Per-host timeout in seconds |
 | `retries` | `2` | Extra attempts when no certificate could be read (connection reset, timeout, DNS...), so network blips don't trigger false alerts. Certificate problems are never retried |
 | `fail-on` | `none` | Fail the step when the worst status reaches this level: `none` / `warning` / `critical` / `error` |
@@ -160,6 +160,7 @@ jobs:
 
 - In public repos, GitHub disables scheduled workflows after 60 days without commits, and your monitoring stops silently.
 - Consider pinning to a full commit SHA instead of `@v1`.
+- Runs on `node24`, which needs Actions Runner v2.327.1 or later. GitHub-hosted runners are fine; update self-hosted runners if needed.
 
 ## License
 
