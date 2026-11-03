@@ -1,12 +1,14 @@
 # SSL Expiry Check
 
-零依赖、并行检查 TLS 证书到期时间，返回 JSON，并直接给出可用于告警的输出。
+**English** | [简体中文](README.zh-CN.md)
 
-- **快**：纯 Node 内置模块，无 Docker / 无 `npm install`，所有域名并发检查，单个域名有硬超时
-- **简单**：一个 `index.js`，一个必填参数
-- **方便告警**：`alert` / `status` / `message` 三个输出直接接 `if:` 和 webhook；另有 `fail-on` 让 job 失败从而触发 GitHub 邮件
+A zero-dependency GitHub Action that checks TLS certificate expiry in parallel, returns JSON, and gives you outputs that plug straight into alerting.
 
-## 用法
+- **Fast**: Node built-ins only, no Docker, no `npm install`. All hosts are checked concurrently with a hard per-host timeout
+- **Simple**: one `index.js`, one required input
+- **Alert-friendly**: `alert` / `status` / `message` outputs drop right into `if:` and webhooks; `fail-on` fails the job so GitHub emails you
+
+## Usage
 
 ```yaml
 - uses: AkaraChen/ssl-expiry-action@v1
@@ -17,31 +19,31 @@
       https://api.example.com:8443
 ```
 
-## 输入
+## Inputs
 
-| 名称 | 默认 | 说明 |
+| Name | Default | Description |
 |---|---|---|
-| `urls` | **必填** | 一个或多个 URL / 域名，换行、逗号、空格分隔。不写协议默认 https，不写端口默认 443 |
-| `warning-days` | `30` | 剩余天数 ≤ 该值 → `warning` |
-| `critical-days` | `7` | 剩余天数 ≤ 该值 → `critical`（已过期也是 `critical`） |
-| `timeout` | `10` | 单个域名超时秒数 |
-| `fail-on` | `none` | 最差状态达到该级别时让 step 失败：`none` / `warning` / `critical` / `error` |
-| `ca` | 空 | 额外信任的 CA 证书（内网服务用）。PEM 文本（可含多张证书）或 PEM 文件路径，见下文 |
+| `urls` | **required** | One or more URLs / hosts, separated by newline, comma or space. Scheme defaults to https, port to 443 |
+| `warning-days` | `30` | Days left ≤ this → `warning` |
+| `critical-days` | `7` | Days left ≤ this → `critical` (expired certs are always `critical`) |
+| `timeout` | `10` | Per-host timeout in seconds |
+| `fail-on` | `none` | Fail the step when the worst status reaches this level: `none` / `warning` / `critical` / `error` |
+| `ca` | empty | Extra CA certificate(s) to trust, for internal services. PEM text (may contain several certs) or a path to a PEM file. See below |
 
-## 输出
+## Outputs
 
-| 名称 | 示例 | 说明 |
+| Name | Example | Description |
 |---|---|---|
-| `json` | `[{...}]` | 全部结果，**按严重程度排序（最差在前）** |
-| `status` | `critical` | 所有域名中最差的状态 |
-| `alert` | `true` | 任一域名不是 `ok` 即为 `"true"` |
-| `message` | `🔴 example.com: expires in 3 days (2026-11-06)` | 每个非 ok 域名一行，可直接发到 IM；全部正常时为空 |
+| `json` | `[{...}]` | All results, **sorted by severity (worst first)** |
+| `status` | `critical` | Worst status across all hosts |
+| `alert` | `true` | `"true"` if any host is not `ok` |
+| `message` | `🔴 example.com: expires in 3 days (2026-11-06)` | One line per non-ok host, ready to post to chat. Empty when everything is ok |
 
-状态级别：`ok` < `warning` < `critical` < `error`
+Status levels: `ok` < `warning` < `critical` < `error`
 
-- `error`：连不上、DNS 失败、超时、证书链不受信、域名不匹配等。能读到证书时仍会填 `days_left`
+- `error`: connection refused, DNS failure, timeout, untrusted chain, hostname mismatch, etc. `days_left` is still filled in when the certificate could be read
 
-`json` 中每一项：
+Each item in `json`:
 
 ```json
 {
@@ -56,13 +58,13 @@
 }
 ```
 
-此外 action 还会在运行页面生成 annotation，并在 Job Summary 写一张表。
+The action also adds annotations to the run page and writes a table to the Job Summary.
 
-## 告警方式
+## Alerting
 
-### 1. 邮件（零配置）
+### 1. Email (zero setup)
 
-job 失败时 GitHub 会自动发邮件给最后修改该 workflow cron 的人。
+When a job fails, GitHub emails the user who last modified the workflow's cron schedule.
 
 ```yaml
 with:
@@ -70,40 +72,40 @@ with:
   fail-on: warning
 ```
 
-### 2. Webhook（飞书 / 钉钉 / 企业微信 / Slack）
+### 2. Webhook (Slack / Feishu / DingTalk / WeCom)
 
 ```yaml
 - name: Notify
-  if: steps.ssl.outputs.alert == 'true'   # 若同时用了 fail-on，改成 always() && steps.ssl.outputs.alert == 'true'
+  if: steps.ssl.outputs.alert == 'true'   # with fail-on, use: always() && steps.ssl.outputs.alert == 'true'
   env:
     MSG: ${{ steps.ssl.outputs.message }}
     WEBHOOK: ${{ secrets.WEBHOOK_URL }}
   run: |
-    # 飞书:            {msg_type:"text", content:{text:$t}}
-    # 钉钉 / 企业微信:  {msgtype:"text", text:{content:$t}}
-    # Slack:           {text:$t}
-    jq -n --arg t "SSL 证书告警"$'\n'"$MSG" '{msg_type:"text", content:{text:$t}}' \
+    # Slack:            {text:$t}
+    # Feishu:           {msg_type:"text", content:{text:$t}}
+    # DingTalk / WeCom: {msgtype:"text", text:{content:$t}}
+    jq -n --arg t "SSL certificate alert"$'\n'"$MSG" '{text:$t}' \
       | curl -sf -H 'Content-Type: application/json' -d @- "$WEBHOOK"
 ```
 
-> 通过 `env` 传入 `message` 而不是直接写进 `run`，可以避免脚本注入。钉钉如果开了"自定义关键词"，把 `SSL` 设为关键词即可。
+> Pass `message` through `env` instead of inlining it in `run` to avoid script injection.
 
-### 3. 自定义规则
+### 3. Custom rules
 
 ```yaml
 - if: steps.ssl.outputs.status == 'critical' || steps.ssl.outputs.status == 'error'
-  run: echo "只在严重时处理"
+  run: echo "only on severe problems"
 
 - if: fromJSON(steps.ssl.outputs.json)[0].days_left < 3
-  run: echo "最紧急的证书不到 3 天"
+  run: echo "the most urgent cert has less than 3 days left"
 ```
 
-## 内网服务 / 自建 CA
+## Internal services / private CA
 
-默认只信任 Node 自带的公共根证书（Mozilla 列表），用内部 CA 签发的证书会被判为 `error`。通过 `ca` 传入你的 CA 即可，它会**追加**到公共根证书之上，所以公网和内网域名可以放在同一次检查里。
+By default only Node's bundled public roots (the Mozilla list) are trusted, so certificates issued by an internal CA are reported as `error`. Pass your CA via `ca`. It is **added on top of** the public roots, so public and internal hosts can be checked in the same run.
 
 ```yaml
-# 方式一：PEM 内容放在 secret 或 variable 里（多张证书直接拼在一起）
+# Option 1: PEM content in a secret or variable (concatenate multiple certs)
 - uses: AkaraChen/ssl-expiry-action@v1
   with:
     urls: |
@@ -111,7 +113,7 @@ with:
       git.corp.internal
     ca: ${{ secrets.INTERNAL_CA_PEM }}
 
-# 方式二：仓库里的 PEM 文件（路径相对于仓库根目录，需要先 checkout）
+# Option 2: a PEM file in the repo (path relative to the repo root, checkout first)
 - uses: actions/checkout@v5
 - uses: AkaraChen/ssl-expiry-action@v1
   with:
@@ -119,15 +121,15 @@ with:
     ca: certs/internal-ca.pem
 ```
 
-> 内网域名需要 runner 能访问到，一般意味着用 self-hosted runner。
+> Internal hosts must be reachable from the runner, which usually means a self-hosted runner.
 
-## 完整示例
+## Full example
 
 ```yaml
 name: SSL expiry check
 on:
   schedule:
-    - cron: '0 1 * * *'   # 每天 UTC 01:00
+    - cron: '0 1 * * *'   # daily at 01:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -149,11 +151,15 @@ jobs:
           MSG: ${{ steps.ssl.outputs.message }}
           WEBHOOK: ${{ secrets.WEBHOOK_URL }}
         run: |
-          jq -n --arg t "SSL 证书告警"$'\n'"$MSG" '{msg_type:"text", content:{text:$t}}' \
+          jq -n --arg t "SSL certificate alert"$'\n'"$MSG" '{text:$t}' \
             | curl -sf -H 'Content-Type: application/json' -d @- "$WEBHOOK"
 ```
 
-## 注意
+## Notes
 
-- 公共仓库 60 天没有提交时，GitHub 会自动停用定时 workflow，监控会悄悄停止。
-- 引用时建议固定到完整 commit SHA 而不是 `@v1`。
+- In public repos, GitHub disables scheduled workflows after 60 days without commits, and your monitoring stops silently.
+- Consider pinning to a full commit SHA instead of `@v1`.
+
+## License
+
+[MIT](LICENSE)
